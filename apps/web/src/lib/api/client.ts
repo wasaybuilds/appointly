@@ -7,7 +7,13 @@ import { ApiError } from './api-error';
   expired access token once before retrying.
 */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+/*
+  Same-origin by default, so requests pass through the Next.js rewrite and the
+  session cookie stays first-party. Set NEXT_PUBLIC_API_URL only to bypass the
+  proxy and address the API host directly, which browsers that block
+  third-party cookies will not accept.
+*/
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 export const API_PREFIX = '/api/v1';
 
