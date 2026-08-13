@@ -35,7 +35,15 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-paper">
       <AppNav />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-7">{children}</main>
+      {/*
+        `overflow-x-clip` is a backstop against sideways scroll on phones, where
+        one over-wide child otherwise drags the whole document. `clip` rather
+        than `hidden` because `hidden` would make this a scroll container and
+        change how sticky positioning resolves inside it. Clipping happens at
+        the padding box, so the chat panes that bleed into the gutters with a
+        negative margin still reach the screen edges untouched.
+      */}
+      <main className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-5 py-7">{children}</main>
     </div>
   );
 }
