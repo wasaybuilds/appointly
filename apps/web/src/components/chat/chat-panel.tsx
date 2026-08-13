@@ -41,13 +41,39 @@ const GREETING: ChatMessage = {
   sessionId: 'greeting',
   role: 'assistant',
   content:
-    "Hi! I can book an appointment for you. Tell me what you need and when suits you — for example, \"a dental check-up next Tuesday at 3pm\".",
+    'Hi! I can book an appointment for you. Tell me what you need and when suits you — for example, "a dental check-up next Tuesday at 3pm".',
   createdAt: new Date().toISOString(),
 };
 
-/** Merges incoming messages into the transcript, de-duplicating by id. */
+const PLACEHOLDER_ID_PREFIX = 'optimistic-';
+
+function isPlaceholder(message: ChatMessage): boolean {
+  return message.id.startsWith(PLACEHOLDER_ID_PREFIX);
+}
+
+/**
+ * Merges incoming messages into the transcript, de-duplicating by id and
+ * retiring any placeholder the incoming batch has just superseded.
+ *
+ * A placeholder cannot be matched by id — it carries a client-generated one
+ * while the persisted row carries the server's. The server broadcasts the
+ * user's own message as soon as it is saved, well before the assistant has
+ * replied, so id de-duplication alone leaves the sender looking at their
+ * message twice for as long as the model takes to answer.
+ *
+ * Matching is against the incoming batch rather than the whole transcript, so
+ * repeating the same message later still shows a placeholder for the new send.
+ */
 function mergeMessages(current: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
-  const byId = new Map(current.map((message) => [message.id, message]));
+  const identity = (message: ChatMessage): string => `${message.role}:${message.content}`;
+
+  const superseded = new Set(incoming.filter((message) => !isPlaceholder(message)).map(identity));
+
+  const retained = current.filter(
+    (message) => !isPlaceholder(message) || !superseded.has(identity(message)),
+  );
+
+  const byId = new Map(retained.map((message) => [message.id, message]));
 
   for (const message of incoming) {
     byId.set(message.id, message);
@@ -147,10 +173,10 @@ export function ChatPanel() {
     (content: string) => {
       setSendError(null);
 
-      // Shown immediately so the message appears the instant it is sent; the
-      // real row replaces it by id when the server responds.
+      // Shown immediately so the message appears the instant it is sent;
+      // `mergeMessages` retires it as soon as the persisted row arrives.
       const optimistic: ChatMessage = {
-        id: `optimistic-${Date.now()}`,
+        id: `${PLACEHOLDER_ID_PREFIX}${Date.now()}`,
         sessionId: sessionId ?? '',
         role: 'user',
         content,
@@ -163,10 +189,9 @@ export function ChatPanel() {
       sendMutation.mutate(content, {
         onSettled: () => {
           setIsAssistantTyping(false);
-          // Drop the placeholder once the persisted message has arrived.
-          setLiveMessages((current) =>
-            current.filter((message) => message.id !== optimistic.id),
-          );
+          // Normally already retired by the merge; this covers a failed send,
+          // where no persisted row ever arrives to supersede it.
+          setLiveMessages((current) => current.filter((message) => message.id !== optimistic.id));
         },
       });
     },
@@ -207,21 +232,21 @@ export function ChatPanel() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
       <section
         aria-label="Conversation"
-        className="flex h-[calc(100dvh-9rem)] min-h-[30rem] flex-col overflow-hidden rounded-md border border-ink-15"
+        className="border-ink-15 flex h-[calc(100dvh-9rem)] min-h-[30rem] flex-col overflow-hidden rounded-md border"
       >
-        <header className="flex items-center gap-3 border-b border-ink-15 px-5 py-3.5">
-          <span className="flex size-8 items-center justify-center rounded-md bg-ink text-paper">
+        <header className="border-ink-15 flex items-center gap-3 border-b px-5 py-3.5">
+          <span className="bg-ink text-paper flex size-8 items-center justify-center rounded-md">
             <Sparkles className="size-4" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-semibold text-ink">Booking assistant</h1>
-            <p className="truncate text-xs text-ink-50">
+            <h1 className="text-ink text-sm font-semibold">Booking assistant</h1>
+            <p className="text-ink-50 truncate text-xs">
               {aiEnabled
                 ? 'Ask for an appointment in your own words'
                 : 'Offline — use the booking form on the right'}
             </p>
           </div>
-          <span className="hidden items-center gap-1.5 text-[0.6875rem] text-ink-50 sm:flex">
+          <span className="text-ink-50 hidden items-center gap-1.5 text-[0.6875rem] sm:flex">
             <span
               className={cn('size-1.5 rounded-full', aiEnabled ? 'bg-accent' : 'bg-ink-30')}
               aria-hidden="true"
@@ -231,7 +256,7 @@ export function ChatPanel() {
         </header>
 
         {!aiEnabled ? (
-          <div className="border-b border-ink-15 bg-ink-04 px-5 py-2.5 text-xs text-ink-70">
+          <div className="border-ink-15 bg-ink-04 text-ink-70 border-b px-5 py-2.5 text-xs">
             The AI assistant is not configured, so replies are limited. The booking form works
             normally.
           </div>
@@ -255,7 +280,7 @@ export function ChatPanel() {
                     type="button"
                     disabled={!sessionId}
                     onClick={() => handleSend(starter)}
-                    className="rounded-md border border-ink-15 px-3 py-1.5 text-[0.8125rem] text-ink-70 transition-colors hover:border-ink hover:text-ink disabled:opacity-40"
+                    className="border-ink-15 text-ink-70 hover:border-ink hover:text-ink rounded-md border px-3 py-1.5 text-[0.8125rem] transition-colors disabled:opacity-40"
                   >
                     {starter}
                   </button>
@@ -273,7 +298,11 @@ export function ChatPanel() {
           ) : null}
         </div>
 
-        <ChatComposer onSend={handleSend} isSending={sendMutation.isPending} disabled={!sessionId} />
+        <ChatComposer
+          onSend={handleSend}
+          isSending={sendMutation.isPending}
+          disabled={!sessionId}
+        />
       </section>
 
       <aside aria-label="Booking details" className="lg:sticky lg:top-[5.25rem] lg:self-start">

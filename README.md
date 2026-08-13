@@ -96,14 +96,13 @@ pnpm dev
 - API: <http://localhost:4000>
 - Health: <http://localhost:4000/health>
 
-### Demo accounts
+### Demo account
 
-Both are seeded by `pnpm db:seed`:
+Seeded by `pnpm db:seed`:
 
-| Email | Password | Role |
-| --- | --- | --- |
-| `demo@appointly.dev` | `DemoPass123!` | customer |
-| `owner@appointly.dev` | `DemoPass123!` | admin |
+| Email | Password |
+| --- | --- |
+| `demo@appointly.dev` | `DemoPass123!` |
 
 ### Try it
 
