@@ -24,8 +24,10 @@ services:
     # skip devDependencies, and the build needs tsup.
     # The shared package must be built first — it resolves to ./dist/index.js,
     # which is a build artefact and is not committed.
+    # Render's image already provides pnpm, and lockfileVersion 9.0 is readable
+    # by pnpm 9 through 11; `corepack enable` cannot be used here because it
+    # writes shims into a read-only /usr/bin.
     buildCommand: >-
-      corepack enable &&
       pnpm install --frozen-lockfile --prod=false &&
       pnpm --filter @appointly/shared build &&
       pnpm --filter @appointly/api build
@@ -33,8 +35,11 @@ services:
     startCommand: node apps/api/dist/server.js
 
     envVars:
+      # Pinned deliberately. `engines.node` is the open range ">=20.11.0", which
+      # Render resolves to the newest release available — two majors ahead of
+      # the version this was built and tested against.
       - key: NODE_VERSION
-        value: 20.11.0
+        value: 24.19.0
       - key: NODE_ENV
         value: production
       - key: PORT
