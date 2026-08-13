@@ -113,7 +113,7 @@ export function ReschedulePanel({
                   aria-checked={isSelected}
                   onClick={() => setSelectedSlot(slot.startsAt)}
                   className={cn(
-                    'rounded-md border px-3 py-1.5 text-[0.8125rem] font-medium transition-colors',
+                        'rounded-md border px-3 py-2 text-[0.8125rem] font-medium transition-colors sm:py-1.5',
                     isSelected
                       ? 'border-ink bg-ink text-paper'
                       : 'border-ink-15 text-ink-70 hover:border-ink hover:text-ink',

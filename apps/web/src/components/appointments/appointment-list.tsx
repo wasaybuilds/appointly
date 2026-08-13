@@ -71,7 +71,7 @@ export function AppointmentList() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink-15 pb-5">
+      <div className="flex flex-col gap-4 border-b border-ink-15 pb-5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
           <p className="label-micro">Dashboard</p>
           <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-ink">
@@ -82,8 +82,10 @@ export function AppointmentList() {
           </p>
         </div>
 
+        {/* Spans the width on phones so it reads as one deliberate segmented
+            control, rather than three buttons stranded under the heading. */}
         <div
-          className="flex rounded-md border border-ink-15 p-0.5"
+          className="flex w-full rounded-md border border-ink-15 p-0.5 sm:w-auto"
           role="tablist"
           aria-label="Filter appointments"
         >
@@ -95,7 +97,7 @@ export function AppointmentList() {
               aria-selected={scope === option.value}
               onClick={() => changeScope(option.value)}
               className={cn(
-                'rounded-sm px-3.5 py-1.5 text-[0.8125rem] font-medium transition-colors',
+                'flex-1 rounded-sm px-3.5 py-2 text-[0.8125rem] font-medium transition-colors sm:flex-none sm:py-1.5',
                 scope === option.value ? 'bg-ink text-paper' : 'text-ink-50 hover:text-ink',
               )}
             >

@@ -47,12 +47,12 @@ export function AppointmentCard({ appointment }: { appointment: Appointment }) {
   return (
     <article
       className={cn(
-        'group rounded-md border border-ink-15 px-5 py-4 transition-colors hover:border-ink-30',
+        'group rounded-md border border-ink-15 px-4 py-4 transition-colors hover:border-ink-30 sm:px-5',
         isFinished && 'opacity-60',
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
+      <div className="flex flex-col gap-3.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2.5">
             <h3 className="text-[0.9375rem] font-semibold text-ink">{appointment.service.name}</h3>
             <StatusBadge status={appointment.status} />
@@ -65,37 +65,48 @@ export function AppointmentCard({ appointment }: { appointment: Appointment }) {
           </p>
 
           <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[0.8125rem] text-ink-50">
-            <span className="flex items-center gap-1.5">
-              <Clock className="size-3.5" aria-hidden="true" />
+            <span className="flex shrink-0 items-center gap-1.5">
+              <Clock className="size-3.5 shrink-0" aria-hidden="true" />
               {appointment.service.durationMinutes} minutes
             </span>
-            <span className="flex items-center gap-1.5">
-              <Mail className="size-3.5" aria-hidden="true" />
-              {appointment.customerEmail}
+            {/* An address has no break points, so an untruncated long one widens
+                the card past the viewport and scrolls the whole page sideways. */}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Mail className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{appointment.customerEmail}</span>
             </span>
           </div>
 
           {appointment.notes ? (
             <p className="mt-3 flex items-start gap-2 border-t border-ink-15 pt-3 text-[0.8125rem] text-ink-50">
               <StickyNote className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              <span className="min-w-0">{appointment.notes}</span>
+              <span className="min-w-0 break-words">{appointment.notes}</span>
             </p>
           ) : null}
         </div>
 
+        {/* On phones the actions become a divided footer with the buttons
+            sharing the width, which reads as part of the card instead of two
+            controls left stranded under the text by a wrap. */}
         {canModify ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 border-t border-ink-15 pt-3.5 sm:shrink-0 sm:border-0 sm:pt-0">
             {isConfirmingCancel ? (
               <>
                 <Button
                   variant="danger"
                   size="sm"
+                  className="h-9 flex-1 sm:h-8 sm:flex-none"
                   isLoading={cancelMutation.isPending}
                   onClick={() => cancelMutation.mutate()}
                 >
                   Confirm cancel
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setIsConfirmingCancel(false)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 flex-1 sm:h-8 sm:flex-none"
+                  onClick={() => setIsConfirmingCancel(false)}
+                >
                   Keep
                 </Button>
               </>
@@ -104,6 +115,7 @@ export function AppointmentCard({ appointment }: { appointment: Appointment }) {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-9 flex-1 sm:h-8 sm:flex-none"
                   aria-expanded={isRescheduling}
                   onClick={() => {
                     setIsRescheduling((open) => !open);
@@ -115,6 +127,7 @@ export function AppointmentCard({ appointment }: { appointment: Appointment }) {
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="h-9 flex-1 sm:h-8 sm:flex-none"
                   onClick={() => {
                     setIsConfirmingCancel(true);
                     setIsRescheduling(false);

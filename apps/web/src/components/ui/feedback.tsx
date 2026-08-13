@@ -50,7 +50,9 @@ export function Alert({ tone = 'info', title, children, className }: AlertProps)
       )}
     >
       {styles.icon}
-      <div className="min-w-0 flex-1">
+      {/* Alerts carry server and model text, which can contain long unbroken
+          values, so wrapping is forced rather than assumed. */}
+      <div className="min-w-0 flex-1 break-words">
         {title ? <p className="font-medium text-ink">{title}</p> : null}
         <div className={cn('text-ink-70', title && 'mt-0.5')}>{children}</div>
       </div>
