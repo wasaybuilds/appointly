@@ -1,0 +1,91 @@
+# Render blueprint for the Appointly API.
+#
+# The web client is deployed separately on Vercel; only the API lives here,
+# because Socket.IO needs a long-lived process that serverless platforms cannot
+# provide. PostgreSQL is an external managed instance (Aiven), so no database is
+# declared below — supply its connection string as DATABASE_URL.
+#
+# Secrets marked `sync: false` are deliberately not stored in this file; Render
+# prompts for them when the blueprint is applied.
+
+services:
+  - type: web
+    name: appointly-api
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+
+    # `/health` sits outside the API prefix and ahead of the rate limiter, so
+    # platform probes are never versioned or throttled.
+    healthCheckPath: /health
+
+    # `--prod=false` is required: NODE_ENV=production would otherwise make pnpm
+    # skip devDependencies, and the build needs tsup.
+    # The shared package must be built first — it resolves to ./dist/index.js,
+    # which is a build artefact and is not committed.
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile --prod=false &&
+      pnpm --filter @appointly/shared build &&
+      pnpm --filter @appointly/api build
+
+    startCommand: node apps/api/dist/server.js
+
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.0
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: LOG_LEVEL
+        value: info
+
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: true
+      - key: DATABASE_POOL_MAX
+        value: 10
+
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: JWT_REFRESH_TTL
+        value: 7d
+
+      # The browser and the API are on different registrable domains, so a Lax
+      # cookie would never be sent cross-site. `none` implies Secure, which
+      # config/env.ts sets automatically.
+      - key: COOKIE_SAME_SITE
+        value: none
+
+      # Comma-separated; add Vercel preview URLs here as needed.
+      - key: WEB_ORIGIN
+        sync: false
+
+      # Omit to run the assistant in deterministic fallback mode.
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: MISTRAL_MODEL
+        value: mistral-small-latest
+
+      - key: BUSINESS_TIMEZONE
+        value: UTC
+      - key: BUSINESS_OPEN_HOUR
+        value: 9
+      - key: BUSINESS_CLOSE_HOUR
+        value: 18
+
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 60000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 120
+      - key: RATE_LIMIT_AUTH_MAX_REQUESTS
+        value: 10
+      - key: RATE_LIMIT_CHAT_MAX_REQUESTS
+        value: 20
