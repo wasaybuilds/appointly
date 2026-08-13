@@ -27,9 +27,12 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
       </span>
 
       <div className={cn('flex max-w-[78%] flex-col gap-1', isUser && 'items-end')}>
+        {/* `break-words` matters more than it looks: max-width cannot break an
+            unbroken token, so a long URL or address would push past the bubble
+            and turn the transcript into a sideways scroller. */}
         <div
           className={cn(
-            'rounded-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
+            'rounded-md px-3.5 py-2.5 text-sm leading-relaxed break-words whitespace-pre-wrap',
             isUser ? 'bg-ink text-paper' : 'border border-ink-15 bg-ink-04 text-ink',
           )}
         >

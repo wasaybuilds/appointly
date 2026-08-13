@@ -94,7 +94,7 @@ export function ChatComposer({
             resize();
           }}
           onKeyDown={handleKeyDown}
-          className="max-h-40 flex-1 resize-none bg-transparent py-1.5 text-sm text-ink outline-none disabled:cursor-not-allowed"
+          className="max-h-40 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-sm text-ink outline-none disabled:cursor-not-allowed"
         />
 
         <Button
@@ -103,18 +103,22 @@ export function ChatComposer({
           disabled={!canSend}
           isLoading={isSending}
           aria-label="Send message"
-          className="mb-0.5 size-8 shrink-0 rounded-md p-0"
+          className="mb-0.5 size-9 shrink-0 rounded-md p-0 sm:size-8"
         >
           {isSending ? null : <ArrowUp className="size-4" aria-hidden="true" />}
         </Button>
       </div>
 
       <div className="mt-2 flex justify-between px-0.5">
-        <span className="text-[0.6875rem] text-ink-50">
+        {/* Keyboard guidance is meaningless on a touch keyboard, where Enter
+            inserts a newline, and it is the widest thing in this row. */}
+        <span className="hidden text-[0.6875rem] text-ink-50 sm:inline">
           Enter to send · Shift + Enter for a new line
         </span>
         {trimmed.length > MAX_CHAT_MESSAGE_LENGTH * 0.8 ? (
-          <span className={cn('text-[0.6875rem]', isOverLimit ? 'text-alert' : 'text-ink-50')}>
+          <span
+            className={cn('ml-auto text-[0.6875rem]', isOverLimit ? 'text-alert' : 'text-ink-50')}
+          >
             {trimmed.length} / {MAX_CHAT_MESSAGE_LENGTH}
           </span>
         ) : null}

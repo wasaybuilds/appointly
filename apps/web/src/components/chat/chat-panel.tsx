@@ -45,6 +45,13 @@ const GREETING: ChatMessage = {
   createdAt: new Date().toISOString(),
 };
 
+type MobileView = 'chat' | 'booking';
+
+const MOBILE_VIEWS = [
+  { value: 'chat', label: 'Conversation' },
+  { value: 'booking', label: 'Booking' },
+] as const satisfies readonly { value: MobileView; label: string }[];
+
 const PLACEHOLDER_ID_PREFIX = 'optimistic-';
 
 function isPlaceholder(message: ChatMessage): boolean {
@@ -93,6 +100,9 @@ export function ChatPanel() {
   const [isAssistantTyping, setIsAssistantTyping] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
 
+  /** Which of the two panes is on screen below `lg`, where they cannot share it. */
+  const [mobileView, setMobileView] = useState<MobileView>('chat');
+
   const transcriptRef = useRef<HTMLDivElement>(null);
 
   const sessionQuery = useQuery({
@@ -122,6 +132,23 @@ export function ChatPanel() {
     [sessionQuery.data, liveMessages],
   );
 
+  /**
+   * Records the assistant's booking state, bringing the panel forward on mobile
+   * once it starts asking something of the user.
+   *
+   * Below `lg` the two panes take turns, so an assistant that has fallen back to
+   * the form — or has just confirmed a booking — would otherwise announce it on
+   * a pane the user cannot see. From `lg` they sit side by side and the view
+   * state is inert.
+   */
+  const applyBooking = useCallback((next: BookingResult | null) => {
+    setBooking(next);
+
+    if (next?.outcome === 'needs_form' || next?.outcome === 'booked') {
+      setMobileView('booking');
+    }
+  }, []);
+
   const sendMutation = useMutation({
     mutationFn: (content: string) => {
       if (!sessionId) {
@@ -133,7 +160,7 @@ export function ChatPanel() {
       setLiveMessages((current) =>
         mergeMessages(current, [turn.userMessage, turn.assistantMessage]),
       );
-      setBooking(turn.booking);
+      applyBooking(turn.booking);
 
       if (turn.booking.appointment) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all });
@@ -153,21 +180,23 @@ export function ChatPanel() {
         setIsAssistantTyping(isTyping);
       },
       [SOCKET_EVENTS.BOOKING_UPDATED]: ({ booking: update }: BookingUpdatedPayload) => {
-        setBooking(update);
+        applyBooking(update);
       },
     }),
-    [],
+    [applyBooking],
   );
 
   useSocket(socketHandlers, sessionId);
 
-  // Keep the newest message in view as the conversation grows.
+  // Keep the newest message in view as the conversation grows. `mobileView` is a
+  // dependency because hiding the pane zeroes its scroll offset, so coming back
+  // from the booking tab would otherwise land at the top of the transcript.
   useEffect(() => {
     const element = transcriptRef.current;
     if (!element) return;
 
     element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
-  }, [messages, isAssistantTyping]);
+  }, [messages, isAssistantTyping, mobileView]);
 
   const handleSend = useCallback(
     (content: string) => {
@@ -200,7 +229,7 @@ export function ChatPanel() {
 
   const handleBooked = useCallback(
     (appointment: Appointment) => {
-      setBooking({
+      applyBooking({
         outcome: 'booked',
         missingFields: [],
         reason: null,
@@ -209,7 +238,7 @@ export function ChatPanel() {
       });
       void queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all });
     },
-    [queryClient],
+    [applyBooking, queryClient],
   );
 
   if (sessionQuery.isLoading || servicesQuery.isLoading) {
@@ -229,12 +258,59 @@ export function ChatPanel() {
   const transcript = isEmptyTranscript ? [GREETING] : messages;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
+    /*
+      On phones the grid owns the viewport: it starts below the header and runs
+      to the bottom edge, with `-mb-7` cancelling the layout's bottom padding so
+      nothing trails underneath. The panes then size themselves from the `1fr`
+      row instead of from a hand-counted `calc`, so neither the switcher's height
+      nor the page padding has to be duplicated as a magic number here.
+    */
+    <div className="-mb-7 grid h-[calc(100dvh-5.25rem)] grid-rows-[auto_minmax(0,1fr)] gap-4 sm:mb-0 sm:h-[calc(100dvh-7rem)] lg:h-auto lg:grid-cols-[minmax(0,1fr)_23rem] lg:grid-rows-none lg:gap-6">
+      {/* Below `lg` the two panes take turns instead of stacking. Stacked, the
+          booking panel sat under a transcript that scrolls itself, so reaching
+          it meant scrolling a page through a scrollable region — and each pane
+          got roughly half a screen. Switching gives both the full height. */}
+      <div
+        className="flex rounded-md border border-ink-15 p-0.5 lg:hidden"
+        role="tablist"
+        aria-label="Chat views"
+      >
+        {MOBILE_VIEWS.map((view) => (
+          <button
+            key={view.value}
+            type="button"
+            role="tab"
+            aria-selected={mobileView === view.value}
+            onClick={() => setMobileView(view.value)}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-1.5 rounded-sm py-2 text-[0.8125rem] font-medium transition-colors',
+              mobileView === view.value ? 'bg-ink text-paper' : 'text-ink-50 hover:text-ink',
+            )}
+          >
+            {view.label}
+            {/* Marks the booking pane while it is out of sight, so progress the
+                assistant has made is never silently hidden behind a tab. */}
+            {view.value === 'booking' && booking && mobileView !== 'booking' ? (
+              <span className="size-1.5 rounded-full bg-accent" aria-label="has updates" />
+            ) : null}
+          </button>
+        ))}
+      </div>
+
+      {/* Runs edge to edge on phones. Now that the conversation owns the whole
+          screen, a card border and the page gutters are just chrome around the
+          only thing on it — the negative margin cancels the layout's padding so
+          the transcript gets that width back. It becomes a card again at `sm`. */}
       <section
         aria-label="Conversation"
-        className="border-ink-15 flex h-[calc(100dvh-9rem)] min-h-[30rem] flex-col overflow-hidden rounded-md border"
+        className={cn(
+          'border-ink-15 -mx-5 flex min-h-0 flex-col overflow-hidden border-y',
+          'sm:mx-0 sm:rounded-md sm:border-x',
+          'lg:h-[calc(100dvh-9rem)] lg:min-h-[30rem]',
+          mobileView === 'booking' && 'hidden lg:flex',
+        )}
       >
-        <header className="border-ink-15 flex items-center gap-3 border-b px-5 py-3.5">
+        <header className="border-ink-15 flex items-center gap-3 border-b px-4 py-3.5 sm:px-5">
           <span className="bg-ink text-paper flex size-8 items-center justify-center rounded-md">
             <Sparkles className="size-4" aria-hidden="true" />
           </span>
@@ -243,15 +319,20 @@ export function ChatPanel() {
             <p className="text-ink-50 truncate text-xs">
               {aiEnabled
                 ? 'Ask for an appointment in your own words'
-                : 'Offline — use the booking form on the right'}
+                : 'Offline — use the booking form instead'}
             </p>
           </div>
-          <span className="text-ink-50 hidden items-center gap-1.5 text-[0.6875rem] sm:flex">
+          {/* The dot survives on phones where the word does not: whether the
+              assistant is live changes what the user should expect from it. */}
+          <span
+            className="text-ink-50 flex shrink-0 items-center gap-1.5 text-[0.6875rem]"
+            aria-label={aiEnabled ? 'Assistant online' : 'Assistant in fallback mode'}
+          >
             <span
               className={cn('size-1.5 rounded-full', aiEnabled ? 'bg-accent' : 'bg-ink-30')}
               aria-hidden="true"
             />
-            {aiEnabled ? 'Online' : 'Fallback'}
+            <span className="hidden sm:inline">{aiEnabled ? 'Online' : 'Fallback'}</span>
           </span>
         </header>
 
@@ -264,14 +345,17 @@ export function ChatPanel() {
 
         <div
           ref={transcriptRef}
-          className="scrollbar-slim flex-1 space-y-5 overflow-y-auto px-5 py-6"
+          /* Declaring the x axis is not redundant: `overflow-y: auto` alone
+             makes the browser compute `overflow-x` as `auto` too, which turns
+             any stray wide child into a sideways scroll. */
+          className="scrollbar-slim flex-1 space-y-5 overflow-x-hidden overflow-y-auto px-4 py-5 sm:px-5 sm:py-6"
         >
           {transcript.map((message) => (
             <MessageBubble key={message.id} message={message} />
           ))}
 
           {isEmptyTranscript ? (
-            <div className="animate-rise pt-2 pl-10">
+            <div className="animate-rise pt-2 sm:pl-10">
               <p className="label-micro mb-2.5">Try one of these</p>
               <div className="flex flex-wrap gap-2">
                 {STARTERS.map((starter) => (
@@ -305,7 +389,17 @@ export function ChatPanel() {
         />
       </section>
 
-      <aside aria-label="Booking details" className="lg:sticky lg:top-[5.25rem] lg:self-start">
+      {/* Matches the conversation: edge to edge, and scrolling within its own
+          pane rather than growing the page, so the booking form is reachable
+          without the two panes disagreeing about who owns the scrollbar. */}
+      <aside
+        aria-label="Booking details"
+        className={cn(
+          'scrollbar-slim -mx-5 min-h-0 overflow-x-hidden overflow-y-auto sm:mx-0',
+          'lg:sticky lg:top-[5.25rem] lg:self-start lg:overflow-x-visible lg:overflow-y-visible',
+          mobileView === 'chat' && 'hidden lg:block',
+        )}
+      >
         <BookingPanel
           booking={booking}
           services={servicesQuery.data ?? []}

@@ -27,6 +27,12 @@ interface BookingPanelProps {
   onBooked: (appointment: Appointment) => void;
 }
 
+/**
+ * Full-bleed on phones, where this panel is a whole screen rather than a column
+ * beside the conversation, so its side borders would sit on the screen edges.
+ */
+const PANEL_CARD = 'rounded-none border-x-0 sm:rounded-md sm:border-x';
+
 const FIELD_LABELS: Record<string, string> = {
   serviceName: 'which service',
   startsAt: 'a date and time',
@@ -69,7 +75,7 @@ export function BookingPanel({
 
   if (booking?.outcome === 'needs_form') {
     return (
-      <Card>
+      <Card className={PANEL_CARD}>
         <CardHeader
           title="Finish your booking"
           description="Everything the assistant understood is already filled in."
@@ -91,7 +97,7 @@ export function BookingPanel({
 
   if (booking?.outcome === 'collecting') {
     return (
-      <Card>
+      <Card className={PANEL_CARD}>
         <CardHeader title="Booking in progress" description="The assistant is gathering details." />
         <CardBody className="flex flex-col gap-4">
           <ExtractedDetails booking={booking} />
@@ -122,7 +128,7 @@ export function BookingPanel({
   }
 
   return (
-    <Card>
+    <Card className={PANEL_CARD}>
       <CardHeader
         title="Booking"
         description={aiEnabled ? 'Details appear here as you chat.' : 'The assistant is offline.'}
@@ -209,7 +215,7 @@ function ExtractedDetails({ booking }: { booking: BookingResult }) {
 
 function ConfirmationCard({ appointment }: { appointment: Appointment }) {
   return (
-    <Card>
+    <Card className={PANEL_CARD}>
       <CardHeader title="Appointment confirmed" />
       <CardBody className="flex flex-col gap-4">
         <div className="flex items-start gap-3 rounded-md border border-ink-15 bg-ink-04 px-3.5 py-3">
